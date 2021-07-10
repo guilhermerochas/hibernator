@@ -1,0 +1,43 @@
+plugins {
+    id 'java'
+}
+
+group 'com.github.guilhermerochas'
+version '1.0.0'
+
+sourceCompatibility = '1.8'
+targetCompatibility = '1.8'
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    javaMainClass = "com.github.guilhermerochas.hibernator.core.MainCore"
+}
+
+jar {
+    manifest {
+        attributes(
+            'Main-Class': javaMainClass,
+            'Class-Path': '.'
+        )
+    }
+
+    from {
+        configurations.runtimeClasspath.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+    }
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.6.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
+
+    implementation group: 'org.postgresql', name: 'postgresql', version: '42.2.5'
+}
+
+test {
+    useJUnitPlatform()
+}
