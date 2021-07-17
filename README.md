@@ -2,6 +2,12 @@
 
 A modular entity generator for the Java Persistence API 
 
+```bash
+ usage: hibernator <opt>
+ -h,--help       prints help option
+ -table <name>   name of the table entity
+```
+
 ## TODOS
 
  - Add a bin folder with bash and powershell scripts for running the application
