@@ -3,6 +3,8 @@ package com.github.guilhermerochas.hibernator.core;
 import com.github.guilhermerochas.hibernator.base.IModelBase;
 import com.github.guilhermerochas.hibernator.models.ColumnMetadata;
 
+import java.io.File;
+import java.io.FileWriter;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
@@ -18,20 +20,21 @@ public class EntityBuilder {
         this.modelBase = modelBase;
     }
 
-    public void build(Connection conn, String tableName, boolean validationConstraints) {
+    public void build(Connection conn, String tableName) {
         try {
             if (conn.isClosed()) {
-                System.err.println("Connection is closed??????");
+                System.err.println("Not able to perform entity creation because connection was closed!");
                 return;
             }
 
             DatabaseMetaData metaData = conn.getMetaData();
             ResultSet resultSet = metaData.getTables(null, null, tableName, new String[]{"TABLE"});
+
             if (!resultSet.next())
                 throw new Exception("Not able to find specified database!");
 
             stringFileBuilder = new StringBuilder();
-            setImports(validationConstraints);
+            stringFileBuilder.append("import javax.persistence.*;\n\n");
 
             // Setup Default Annotations;
             stringFileBuilder.append("@Entity\n");
@@ -41,28 +44,21 @@ public class EntityBuilder {
             stringFileBuilder.append("public class ").append(tableNameToClassName(tableName)).append(" {\n");
 
             // Column Fields
-            ArrayList<ColumnMetadata> metadata = (ArrayList<ColumnMetadata>) modelBase.getColumnMetadata(conn, tableName).orElse(null);
-            setColumnFields(validationConstraints, metadata);
+            ArrayList<ColumnMetadata> metadata = (ArrayList<ColumnMetadata>) modelBase.getColumnMetadata(conn, tableName).orElse(new ArrayList<>());
+            setColumnFields(metadata);
 
             // Getters and Setters
             setGettersAndSetters(metadata);
 
             // EOF (End of the file)
             stringFileBuilder.append("}");
-            System.out.println(stringFileBuilder.toString());
+
+            // Creates file
+            createNewFile(tableNameToClassName(tableName).concat(".java"), stringFileBuilder);
         } catch (Exception e) {
             e.printStackTrace();
             System.err.println(e.getMessage());
             System.exit(1);
-        }
-    }
-
-    private void setImports(boolean validationConstraints) {
-        stringFileBuilder.append("import javax.persistence.*;\n\n");
-        if (validationConstraints) {
-            stringFileBuilder.append("import javax.validation.constraints.NotNull;\n" +
-                    "import javax.validation.constraints.Null;\n" +
-                    "import javax.validation.constraints.Size;\n\n");
         }
     }
 
@@ -96,18 +92,16 @@ public class EntityBuilder {
         return builder.toString();
     }
 
-    private void setColumnFields(boolean validationConstraints, ArrayList<ColumnMetadata> metadata) {
-        if (metadata == null) {
+    private void setColumnFields(ArrayList<ColumnMetadata> metadata) {
+        if (metadata.isEmpty()) {
             Scanner scanner = new Scanner(System.in);
             System.out.print("No columns were found in the table, wanna continue (Y/N)");
             String userInput = scanner.next();
-            if (!userInput.toUpperCase().equals("Y")) {
+            if (!userInput.equalsIgnoreCase("Y")) {
                 System.out.println("Processing Cancelled!");
                 stringFileBuilder = null;
                 return;
             }
-
-            metadata = new ArrayList<>();
         }
 
         HashMap<String, String> columnFieldMap = modelBase.getColumnFieldMap();
@@ -119,24 +113,38 @@ public class EntityBuilder {
 
             stringFileBuilder.append("@Column(name = \"").append(data.getColumnName()).append("\")\n");
 
-            if (validationConstraints) {
-                if (data.getCharacterMinimumLength().isPresent()) {
-                    stringFileBuilder.append("@Size(min = 0, max = ").append(data.getCharacterMinimumLength().get()).append(")\n");
-                }
-
-                if (data.isNullable()) {
-                    stringFileBuilder.append("@Null\n");
-                } else {
-                    stringFileBuilder.append("@NotNull\n");
-                }
-            }
-
             if (data.isGenerated()) {
                 stringFileBuilder.append("@GeneratedValue(strategy = GenerationType.IDENTITY)\n");
             }
 
             stringFileBuilder.append("private ").append(columnFieldMap.getOrDefault(data.getDataType(), "NULL")).append(" ").append(columnNameToField(data.getColumnName())).append("; \n");
             stringFileBuilder.append("\n");
+        }
+    }
+
+    private void createNewFile(String filename, StringBuilder fileContent) {
+        try {
+            File javaClassFile = new File(filename);
+
+            if (javaClassFile.createNewFile()) {
+                if(!javaClassFile.canWrite()) {
+                    System.out.println("Not able to write the content to the file");
+                    System.exit(1);
+                }
+
+                try(FileWriter writer = new FileWriter(javaClassFile)) {
+                    writer.write(fileContent.toString());
+                }  catch (Exception e) {
+                    System.err.println("Not able to write to file: " + e.getMessage());
+                    System.exit(1);
+                }
+            } else {
+                System.err.println("file already exists!");
+                System.exit(1);
+            }
+        } catch (Exception e){
+            System.err.println("Not able to create file: " + e.getMessage());
+            System.exit(1);
         }
     }
 

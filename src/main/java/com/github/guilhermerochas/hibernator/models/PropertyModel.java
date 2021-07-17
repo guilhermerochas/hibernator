@@ -8,7 +8,6 @@ public class PropertyModel {
     private String passoword;
     private String database;
     private String host;
-    private String port;
 
 
     public ConnectionType getDriver() {
@@ -59,15 +58,6 @@ public class PropertyModel {
 
     public PropertyModel setHost(String host) {
         this.host = setSafeProperty(host, "host").get();
-        return this;
-    }
-
-    public String getPort() {
-        return port;
-    }
-
-    public PropertyModel setPort(String port) {
-        this.port = setSafeProperty(port, "port").get();
         return this;
     }
 
